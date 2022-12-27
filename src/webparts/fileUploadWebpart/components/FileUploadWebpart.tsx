@@ -9,6 +9,8 @@ import { PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/People
 import { sp } from '@pnp/sp/presets/all';
 import { TextField } from 'office-ui-fabric-react';
 
+let userId: any;
+let userName: any;
 export default class FileUploadWebpart extends React.Component<IFileUploadWebpartProps, IFileUploadWebpartState> {
   constructor(props) {
     super(props);
@@ -23,8 +25,9 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
     };
     this._getPeoplePickerItems = this._getPeoplePickerItems.bind(this);
     this.onTextChange = this.onTextChange.bind(this);
-    let user: any = this.props.context.pageContext.user;
-    console.log("user", user);
+    userId = this.props.context.pageContext.legacyPageContext.userId;
+    userName = this.props.context.pageContext.legacyPageContext.userDisplayName;
+    console.log("user", userName);
   }
 
   public componentDidMount(): void {
@@ -32,13 +35,21 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
   }
 
   private async getAllDocumentsByApprovers() {
+    const { items } = this.state;
+    let filterFile: any;
     let data: Array<any> = [];
     await sp.web.getFolderByServerRelativeUrl(`/sites/SPFxCrudDemo/MyDocs`).files
-      .expand("ListItemAllFields")
-      //.filter(`(ListItemAllFields/FieldValuesAsText/Approvers eq '${user.displayName}')`).expand("ListItemAllFields", "Author")
+      .expand("ListItemAllFields/FieldValuesAsText")
+      .filter(`substringof('${userName}',ListItemAllFields/FieldValuesAsText/Approvers)`)
+      //.filter(`ListItemAllFields/ApproversId eq ${userId}`)//.expand("ListItemAllFields", "Author")
       .get()
       .then(async f => {
-        data = f;
+        data = f
+        // filterFile = f.filter(d => {
+        //   if (d['ListItemAllFields'].ApproversId.includes(userId)) {
+        //     return d;
+        //   }
+        // });
         await this.setState({ items: data });
       })
       .catch(err => {
@@ -133,6 +144,7 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
                     alert("File metedata updated sucessfully");
                   });
               });
+              this.getAllDocumentsByApprovers();
             })
             .catch((error) => {
               alert("Error is uploading");
@@ -207,7 +219,7 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
                             {item.Name}
                           </a>
                         </td>
-                        <td>{item.ListItemAllFields.ApproversId.map(i => { return i + ', ' })}</td>
+                        <td>{item.ListItemAllFields.FieldValuesAsText.Approvers}</td>
                         <td>{item.ListItemAllFields.ApproverResponse}</td>
                       </tr>;
                     })
