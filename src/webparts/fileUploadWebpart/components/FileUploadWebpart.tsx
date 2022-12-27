@@ -8,7 +8,7 @@ import { FilePicker, IFilePickerResult } from "@pnp/spfx-controls-react/lib/File
 import { PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import { sp } from '@pnp/sp/presets/all';
 import { TextField } from 'office-ui-fabric-react';
-let user: any;
+
 export default class FileUploadWebpart extends React.Component<IFileUploadWebpartProps, IFileUploadWebpartState> {
   constructor(props) {
     super(props);
@@ -23,20 +23,12 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
     };
     this._getPeoplePickerItems = this._getPeoplePickerItems.bind(this);
     this.onTextChange = this.onTextChange.bind(this);
-    user = this.props.context.pageContext.user;
+    let user: any = this.props.context.pageContext.user;
     console.log("user", user);
   }
 
   public componentDidMount(): void {
     this.getAllDocumentsByApprovers();
-    this.getAllDocuments();
-  }
-
-  private async getAllDocuments() {
-    let data: any;
-    data = await sp.web.getFolderByServerRelativeUrl(`/sites/SPFxCrudDemo/MyDocs`).files
-      .get();
-    console.log("Files Data", data);
   }
 
   private async getAllDocumentsByApprovers() {
@@ -47,7 +39,6 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
       .get()
       .then(async f => {
         data = f;
-        let d = data[0].ListItemAllFields.ApproversId['9']
         await this.setState({ items: data });
       })
       .catch(err => {
@@ -199,7 +190,7 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
           <div className={styles.row}>
             <div className={styles.column}>
               <table style={{ border: '1px', borderColor: 'black', borderStyle: 'dotted', width: '100%' }}>
-                <thead style={{ backgroundColor: "aqua;" }}>
+                <thead style={{ backgroundColor: "aqua" }}>
                   <tr>
                     <th>File Name</th>
                     <th>Approvers</th>
