@@ -7,10 +7,11 @@ import { DragDropFiles } from "@pnp/spfx-controls-react/lib/DragDropFiles";
 import { FilePicker, IFilePickerResult } from "@pnp/spfx-controls-react/lib/FilePicker";
 import { PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import { sp } from '@pnp/sp/presets/all';
-import { TextField } from 'office-ui-fabric-react';
+import { TextField, PrimaryButton, Dialog, DialogFooter, DefaultButton, DialogType } from 'office-ui-fabric-react';
 
 let userId: any;
 let userName: any;
+let loggedInUserEmail: string;
 export default class FileUploadWebpart extends React.Component<IFileUploadWebpartProps, IFileUploadWebpartState> {
   constructor(props) {
     super(props);
@@ -21,13 +22,14 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
       Approvers: [],
       ApproverResponse: '',
       filePickerResult: [],
-      items: []
+      items: [],
+      hideDialog: true
     };
     this._getPeoplePickerItems = this._getPeoplePickerItems.bind(this);
     this.onTextChange = this.onTextChange.bind(this);
     userId = this.props.context.pageContext.legacyPageContext.userId;
     userName = this.props.context.pageContext.legacyPageContext.userDisplayName;
-    console.log("user", userName);
+    loggedInUserEmail = this.props.context.pageContext.user.email;
   }
 
   public componentDidMount(): void {
@@ -35,25 +37,42 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
   }
 
   private async getAllDocumentsByApprovers() {
-    const { items } = this.state;
-    let filterFile: any;
     let data: Array<any> = [];
     await sp.web.getFolderByServerRelativeUrl(`/sites/SPFxCrudDemo/MyDocs`).files
       .expand("ListItemAllFields/FieldValuesAsText")
-      .filter(`substringof('${userName}',ListItemAllFields/FieldValuesAsText/Approvers)`)
-      //.filter(`ListItemAllFields/ApproversId eq ${userId}`)//.expand("ListItemAllFields", "Author")
+      .filter(`substringof('${loggedInUserEmail}',ListItemAllFields/FieldValuesAsText/Approvers)`)
       .get()
       .then(async f => {
-        data = f
-        // filterFile = f.filter(d => {
-        //   if (d['ListItemAllFields'].ApproversId.includes(userId)) {
-        //     return d;
-        //   }
-        // });
+        data = f;
         await this.setState({ items: data });
       })
       .catch(err => {
         console.log("Errors", err);
+      });
+  }
+
+  private async ShowDialog(fileName: any) {
+    await this.setState({
+      hideDialog: false,
+      fileName: fileName
+    });
+  }
+
+  private async ApproveFile() {
+    let FileMetaData: any = {
+      ApproverResponse: this.state.ApproverResponse
+    };
+    await sp.web.getFolderByServerRelativeUrl(`/sites/SPFxCrudDemo/MyDocs`).files
+      .expand("ListItemAllFields/FieldValuesAsText").getByName(this.state.fileName).getItem()
+      .then(f => {
+        f.file.getItem().then(item => {
+          console.log("item", item);
+          item.update(FileMetaData)
+            .then(() => {
+              this.setState({ hideDialog: true });
+              alert("File metedata updated sucessfully");
+            });
+        });
       });
   }
 
@@ -128,7 +147,7 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
   private async saveIntoSharePoint(files: IFilePickerResult[]) {
     let FileMetaData: any = {
       ApproversId: { results: this.state.Approvers },
-      ApproverResponse: this.state.ApproverResponse
+      ApproverResponse: "Pending"
     };
 
     files.map(file => {
@@ -155,7 +174,7 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
   }
 
   public render(): React.ReactElement<IFileUploadWebpartProps> {
-    const { ApproverResponse, items } = this.state;
+    const { ApproverResponse, items, hideDialog } = this.state;
     return (
       <div>
         <div className={styles.container}>
@@ -174,11 +193,6 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
                 principalTypes={[PrincipalType.User]}
                 resolveDelay={1000}
               />
-              <TextField
-                label='Approver Resonse'
-                value={ApproverResponse}
-                onChange={(e, value) => this.onTextChange(value)}
-              />
               <FilePicker
                 label={'Select or upload '}
                 accepts={[".gif", ".jpg", ".jpeg", ".bmp", ".ico", ".png", ".svg", ".pdf", ".docx", ".doc", ".xls", ".xlsx"]}
@@ -196,20 +210,45 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
               >
                 Drag and drop here...
               </DragDropFiles> */}
+              <Dialog
+                hidden={hideDialog}
+                onDismiss={(e) => this.setState({ hideDialog: true })}
+                dialogContentProps={{
+                  type: DialogType.close,
+                  title: 'Enter Approver Remark'
+                }}
+                modalProps={{
+                  isBlocking: true,
+                  styles: { main: { maxWidth: '450px' } },
+                }}
+              >
+                <TextField
+                  label='Approver Resonse'
+                  value={ApproverResponse}
+                  onChange={(e, value) => this.onTextChange(value)}
+                />
+                <DialogFooter>
+                  <PrimaryButton onClick={() => this.ApproveFile()}
+                    text="Save" />
+                  <DefaultButton onClick={(e) => this.setState({ hideDialog: true })}
+                    text="Cancel" />
+                </DialogFooter>
+              </Dialog>
             </div>
           </div>
 
           <div className={styles.row}>
             <div className={styles.column}>
               <table style={{ border: '1px', borderColor: 'black', borderStyle: 'dotted', width: '100%' }}>
-                <thead style={{ backgroundColor: "aqua" }}>
+                <thead>
                   <tr>
                     <th>File Name</th>
-                    <th>Approvers</th>
                     <th>Approver Response</th>
+                    {/* <th>Approvers</th> */}
+                    <th>Action</th>
                   </tr>
                 </thead>
-                <tbody style={{ backgroundColor: "cornsilk", textAlign: "center" }}>
+                <tbody style={{ textAlign: "center" }}>
                   {
                     items.length > 0 && items.map((item) => {
                       return <tr>
@@ -219,8 +258,14 @@ export default class FileUploadWebpart extends React.Component<IFileUploadWebpar
                             {item.Name}
                           </a>
                         </td>
-                        <td>{item.ListItemAllFields.FieldValuesAsText.Approvers}</td>
+                        {/* <td>{item.ListItemAllFields.FieldValuesAsText.Approvers}</td> */}
                         <td>{item.ListItemAllFields.ApproverResponse}</td>
+                        <td>
+                          <PrimaryButton
+                            text='Approve'
+                            onClick={() => this.ShowDialog(item.Name)}
+                          />
+                        </td>
                       </tr>;
                     })
                   }

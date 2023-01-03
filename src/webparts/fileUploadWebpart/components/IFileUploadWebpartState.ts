@@ -3,4 +3,6 @@ export interface IFileUploadWebpartState {
   ApproverResponse?: any;
   filePickerResult?: any[];
   items?: any[];
+  hideDialog?: boolean;
+  fileName?: string;
 }
